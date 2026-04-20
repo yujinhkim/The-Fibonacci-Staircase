@@ -122,13 +122,13 @@ st.divider()
 if use_log:
     colorscale = 'Blues' 
     z_title = "Log10(Height) + 1"
-    plot_title = f"Fibonacci Staircase (first {N**2} Fibonacci numers)"
+    plot_title = f"Fibonacci Staircase (first {N**2} Fibonacci numbers)"
     aspect_mode = 'auto' 
     aspect_ratio = None
 else:
     colorscale = 'Plasma' 
     z_title = "True Height"
-    plot_title = f"Fibonacci Staircase (first {N**2} Fibonacci numers)"
+    plot_title = f"Fibonacci Staircase (first {N**2} Fibonacci numbers)"
     aspect_mode = 'manual'
     aspect_ratio = dict(x=1, y=1, z=0.6) 
 
