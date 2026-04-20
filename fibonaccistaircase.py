@@ -32,12 +32,21 @@ def create_snaking_grids(N):
                 idx += 1
     return h_grid, color_grid
 
+def format_fib_label(val):
+    """Formats large Fibonacci numbers so they don't visually overlap and clutter."""
+    if val >= 1e6:
+        return f"{val:.2e}"  
+    else:
+        return str(int(val)) 
+
 def build_voxel_mesh(h, c, use_log):
-    """Constructs the 3D blocky mesh based on whether log-scale is toggled."""
+    """Constructs the 3D blocky mesh and calculates floating text coordinates."""
     N = h.shape[0]
     vertices = []
     i_faces, j_faces, k_faces = [], [], []
     vertex_colors = []
+    
+    text_x, text_y, text_z, text_labels = [], [], [], []
     
     v_idx = 0
     for y in range(N):
@@ -49,11 +58,15 @@ def build_voxel_mesh(h, c, use_log):
             y0, y1 = y - 0.5, y + 0.5
             
             z0 = 0
-            # Apply log scale to geometry if the student checked the box
             if use_log:
                 z1 = np.log10(H) + 1 if H > 0 else 0
             else:
                 z1 = H
+                
+            text_x.append(x)
+            text_y.append(y)
+            text_z.append(z1) 
+            text_labels.append(format_fib_label(H))
             
             box_verts = [
                 [x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], 
@@ -75,55 +88,50 @@ def build_voxel_mesh(h, c, use_log):
                 
             v_idx += 8
             
-    # Handle empty grids safely
     if not vertices:
-        return [], [], [], [], [], [], []
+        return [], [], [], [], [], [], [], [], [], [], []
         
     vx, vy, vz = zip(*vertices)
-    return vx, vy, vz, i_faces, j_faces, k_faces, vertex_colors
+    return vx, vy, vz, i_faces, j_faces, k_faces, vertex_colors, text_x, text_y, text_z, text_labels
 
 # ==========================================
 # STREAMLIT APPLET UI
 # ==========================================
 
-# Configure the webpage appearance
-st.set_page_config(page_title="Fibonacci Staircase Explorer", layout="centered")
+st.set_page_config(page_title="Feel better Dr. Park!", layout="centered")
 
-st.title("Fibonacci 3D Staircase Explorer")
+st.title("The Fibonacci Staircase")
 
-# 1) Applet Input: N
 N = st.number_input(
-    "Choose N, and I will show you the first N^2 Fibonacci numbers", 
+    "Choose N, and I'll show you the first N^2 Fibonacci numbers", 
     min_value=1, 
-    max_value=12,  # Capped at 12 to prevent the browser from lagging on massive meshes
+    max_value=12,  
     value=5, 
     step=1
 )
 
-# 2) Applet Input: Log-Scale Toggle
-use_log = st.checkbox("Plot using Log-Scale (Linear Staircase)")
+use_log = st.checkbox("Click to plot using a logarithmic scale")
+# NEW: Checkbox to toggle the labels on and off (defaults to True)
+show_labels = st.checkbox("Show the numbers", value=True)
 
-st.divider() # Visual separator
+st.divider()
 
-# Generate the data based on inputs
-h_grid, c_grid = create_snaking_grids(N)
-vx, vy, vz, i_faces, j_faces, k_faces, vertex_colors = build_voxel_mesh(h_grid, c_grid, use_log)
+(vx, vy, vz, i_faces, j_faces, k_faces, vertex_colors, 
+ text_x, text_y, text_z, text_labels) = build_voxel_mesh(*create_snaking_grids(N), use_log)
 
-# Conditionally set styling based on the student's toggle choice
 if use_log:
-    colorscale = 'Blues'  # Cool blue monochromatic gradient
+    colorscale = 'Blues' 
     z_title = "Log10(Height) + 1"
-    plot_title = f"Log-Scale Fibonacci Staircase (N={N})"
-    aspect_mode = 'auto' # Let the linear staircase stretch naturally
+    plot_title = f"Fibonacci Staircase (first {N**2} Fibonacci numers)"
+    aspect_mode = 'auto' 
     aspect_ratio = None
 else:
-    colorscale = 'Plasma' # Vibrant, multi-color gradient
+    colorscale = 'Plasma' 
     z_title = "True Height"
-    plot_title = f"True-Height Fibonacci Staircase (N={N})"
+    plot_title = f"Fibonacci Staircase (first {N**2} Fibonacci numers)"
     aspect_mode = 'manual'
-    aspect_ratio = dict(x=1, y=1, z=0.6) # Constrain the massive true heights
+    aspect_ratio = dict(x=1, y=1, z=0.6) 
 
-# Build the 3D Plotly figure
 mesh = go.Mesh3d(
     x=vx, y=vy, z=vz,
     i=i_faces, j=j_faces, k=k_faces,
@@ -138,11 +146,27 @@ mesh = go.Mesh3d(
         len=0.7, 
         tickfont=dict(color="black") 
     ),
-    # Glossy lighting effect
     lighting=dict(ambient=0.4, diffuse=0.8, specular=1.5, roughness=0.1, fresnel=0.2)
 )
 
-fig = go.Figure(data=[mesh])
+# Set up the data list with our primary mesh
+plot_data = [mesh]
+
+# Conditionally add the text trace if the user checked the box
+if show_labels:
+    text_trace = go.Scatter3d(
+        x=text_x, y=text_y, z=text_z,
+        mode='text',
+        text=text_labels,
+        textposition='top center', 
+        textfont=dict(color='black', size=12, family="Arial Black"),
+        showlegend=False,
+        hoverinfo='skip' 
+    )
+    plot_data.append(text_trace)
+
+# Pass the conditional list to the Figure
+fig = go.Figure(data=plot_data)
 
 fig.update_layout(
     title=plot_title,
@@ -156,8 +180,7 @@ fig.update_layout(
     margin=dict(l=0, r=0, b=0, t=50),
     paper_bgcolor='#F5F5F5', 
     font=dict(color='black'),
-    height=600 # Force the plot to take up a nice chunk of the screen
+    height=600 
 )
 
-# Render the Plotly figure inside the Streamlit app
 st.plotly_chart(fig, use_container_width=True)
